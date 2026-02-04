@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Class Scheduler</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
+    
+    <style>
+        /* --- General Web Styling --- */
+        body { font-family: 'Prompt', sans-serif; background-color: #f4f7f6; padding-top: 155px; }
+        .navbar { min-height: 100px; background-color: #0d2b5b !important; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+        .navbar-brand { font-weight: 700; font-size: 1.5rem; color: #fff !important; }
+        .control-panel { background: white; padding: 15px 0; border-bottom: 1px solid #ddd; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        .active-filter { border: 2px solid #0d6efd !important; background-color: #f0f8ff; font-weight: bold; }
+
+        /* --- Container for Cards --- */
+        .schedule-card { 
+            background: white; padding: 20px; border: none;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1); 
+            margin-bottom: 40px; width: 95%; max-width: 1200px; 
+            margin-left: auto; margin-right: auto;     
+        }
+
+        /* --- Master Table --- */
+        .master-table {
+            width: 100%; border-collapse: collapse !important;
+            border: 2px solid #000; background-color: #fff; table-layout: fixed; 
+        }
+        .master-table td { border: 1px solid #000 !important; padding: 0; vertical-align: top; }
+
+        /* Left Info Box */
+        .cell-info-left {
+            width: 20%; text-align: center; padding: 5px !important; vertical-align: middle !important;
+        }
+        .college-logo { width: 70px; height: 70px; object-fit: contain; margin-bottom: 5px; }
+        .info-text { font-size: 0.8rem; font-weight: 600; line-height: 1.4; color: #000; }
+        .info-label { font-size: 0.75rem; font-weight: normal; margin-top: 5px; text-align: left; width: 100%; color: #000 !important; }
+
+        /* Right Summary Table */
+        .inner-summary-table { width: 100%; border-collapse: collapse !important; table-layout: fixed; margin: 0; }
+        .inner-summary-table th, .inner-summary-table td {
+            border: 1px solid #000 !important;
+            padding: 0 2px; text-align: center; height: 22px;
+            font-size: 0.65rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .inner-summary-table { border: none; } 
+        .inner-summary-table th { background-color: #f0f0f0 !important; font-weight: bold; color: #000; }
+        .text-left { text-align: left !important; }
+
+        /* Bottom Matrix Table */
+        .inner-matrix-table { width: 100%; border-collapse: collapse !important; table-layout: fixed; margin: 0; }
+        .inner-matrix-table th, .inner-matrix-table td {
+            border: 1px solid #000 !important;
+            padding: 1px; text-align: center; vertical-align: middle;
+            height: 50px; font-size: 0.75rem; overflow: hidden;
+        }
+        .inner-matrix-table th { background: #f8f9fa !important; font-weight: 600; height: 35px; color: #000; }
+        .day-header { width: 45px !important; background: #fff; color: #000; font-weight: 600; }
+
+        /* Content inside cells */
+        .class-box { display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100%; width: 100%; overflow: hidden; gap: 1px; }
+        .subject-code { font-weight: 700; color: #000; font-size: 0.75rem; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; }
+        .details-badge { font-size: 0.7rem; color: #000; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; }
+        .secondary-info { font-size: 0.65rem; color: #444; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; }
+        
+        .lunch-break { background: #f2f2f2 !important; color: #adb5bd; text-align: center; vertical-align: middle; font-style: italic; font-weight: 600; font-size: 0.8rem; }
+        .evening-slot { background: #fafafa !important; }
+
+        .signature-section { display: none; }
+
+        /* --- PDF Print Settings --- */
+        @media print { 
+            @page { size: A4 landscape; margin: 5mm; }
+            .navbar, .control-panel, .no-print { display: none !important; } 
+            
+            /* Unset Bootstrap Container Width */
+            .container, .container-fluid, .container-lg, .container-md, .container-sm, .container-xl {
+                width: 100% !important; max-width: 100% !important;
+                padding: 0 !important; margin: 0 !important;
+            }
+
+            body { 
+                padding: 0; background: white; width: 100%; 
+                -webkit-print-color-adjust: exact !important; 
+                print-color-adjust: exact !important;
+                font-size: 11pt; 
+            } 
+            
+            .schedule-card { 
+                width: 100% !important; max-width: 100% !important; 
+                margin: 0 !important; padding: 0 !important; 
+                box-shadow: none !important; border: none !important; 
+                page-break-after: always; 
+            }
+            
+            table { width: 100% !important; }
+            .master-table { width: 100% !important; border: 2pt solid #000000 !important; }
+            table, th, td { border: 1pt solid #000000 !important; border-collapse: collapse !important; }
+            
+            .signature-section {
+                display: flex !important; justify-content: space-between; align-items: flex-start;
+                margin-top: 15px; padding-top: 5px; width: 100%; font-size: 10pt; color: #000;
+            }
+            .sig-box { flex: 1; text-align: center; padding: 0 2px; }
+            .sig-line { margin-bottom: 5px; white-space: nowrap; }
+            .sig-role { font-weight: 600; margin-top: 5px; white-space: nowrap; }
+        }
+    </style>
+</head>
+<body>
+
+    <nav class="navbar navbar-expand-lg fixed-top no-print">
+        <div class="container-fluid px-4">
+            <a class="navbar-brand" href="#"><i class="fa-solid fa-graduation-cap me-2"></i>AI Class Scheduler</a>
+            <div class="text-white small ms-auto">
+                <i class="fa-solid fa-user me-2"></i><%= user %> <a href="/logout" class="btn btn-sm btn-outline-light ms-2 rounded-pill">ออก</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="control-panel sticky-top no-print" style="top: 100px; z-index: 1000;">
+        <div class="container">
+            <div class="row g-2 align-items-center">
+                <div class="col-md-3"><select id="filter-group" class="form-select border-primary" onclick="setActiveType('group')" onchange="setActiveType('group')"><option value="" disabled selected>⏳ รอโหลด...</option></select></div>
+                <div class="col-md-3"><select id="filter-teacher" class="form-select border-success" onclick="setActiveType('teacher')" onchange="setActiveType('teacher')"><option value="" disabled selected>⏳ รอโหลด...</option></select></div>
+                <div class="col-md-3"><select id="filter-room" class="form-select border-warning" onclick="setActiveType('room')" onchange="setActiveType('room')"><option value="" disabled selected>⏳ รอโหลด...</option></select></div>
+                
+                <div class="col-md-3 text-end d-flex gap-2 justify-content-end">
+                    <button id="btn-stop" class="btn btn-danger shadow-sm fw-bold" onclick="clearSchedule()"><i class="fa-solid fa-trash-can"></i> ล้าง</button>
+                    <button id="btn-generate" class="btn btn-primary flex-grow-1 shadow-sm fw-bold" onclick="generateAndRender()"><i class="fa-solid fa-play"></i> สุ่มจัดตาราง</button>
+                </div>
+            </div>
+            
+            <div class="row mt-2">
+                 <div class="col text-end">
+                     <button class="btn btn-sm btn-dark me-2" onclick="window.print()"><i class="fa-solid fa-print"></i> 🖨️ พิมพ์หน้านี้ (PDF)</button>
+
+                     <div class="dropdown d-inline-block">
+                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown"><i class="fa-solid fa-layer-group"></i> พิมพ์หลายหน้า</button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><h6 class="dropdown-header">เลือกโหมดการพิมพ์</h6></li>
+                            <li><a class="dropdown-item" href="#" onclick="printSchedule('all')">📑 พิมพ์ทั้งหมด (ทุกกลุ่ม/ครู)</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#" onclick="printSchedule('group')">👤 พิมพ์กลุ่มเรียนทั้งหมด</a></li>
+                            <li><a class="dropdown-item" href="#" onclick="printSchedule('teacher')">🎓 พิมพ์ครูผู้สอนทั้งหมด</a></li>
+                            <li><a class="dropdown-item" href="#" onclick="printSchedule('room')">🏫 พิมพ์ห้องเรียนทั้งหมด</a></li>
+                        </ul>
+                     </div>
+                     <button class="btn btn-sm btn-outline-success ms-2" onclick="exportToExcelPro()"><i class="fa-solid fa-file-excel"></i> Excel (เหมือนหน้าเว็บ)</button>
+                     <button class="btn btn-sm btn-outline-primary ms-1" onclick="exportToCSV()"><i class="fa-solid fa-file-csv"></i> CSV (ข้อมูลดิบ)</button>
+                 </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container mt-5" id="loading-spinner" style="display: none;"><div class="text-center py-5"><div class="spinner-border text-primary mb-3" role="status"></div><h5 class="text-muted">กำลังประมวลผล...</h5></div></div>
+    <div class="container mt-5" id="empty-state"><div class="text-center py-5 text-muted border rounded-3 bg-white shadow-sm"><i class="fa-solid fa-list-check fa-4x mb-4 text-secondary opacity-50"></i><h3>พร้อมทำงาน</h3><p>เลือกเงื่อนไข แล้วกดปุ่ม <b>"สุ่มจัดตาราง"</b></p></div></div>
+    
+    <div class="container mt-4" id="schedule-container" style="display: none;"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        let globalSchedule = [];
+        let activeType = 'group';
+
+        document.addEventListener("DOMContentLoaded", async function() {
+            try {
+                const res = await fetch('/api/init-data');
+                if (!res.ok) throw new Error("Connection Error");
+                const data = await res.json();
+                populateDropdown('filter-group', data.groups, 'กลุ่มเรียนทั้งหมด');
+                populateDropdown('filter-teacher', data.teachers, 'ครูทุกคน');
+                populateDropdown('filter-room', data.rooms, 'ห้องเรียนทั้งหมด');
+                setActiveType('group'); 
+            } catch (err) { console.error(err); alert("Load Error: " + err.message); }
+        });
+
+        function populateDropdown(id, items, defaultLabel) {
+            const el = document.getElementById(id);
+            let html = `<option value="all" selected>${defaultLabel}</option>`;
+            if(items) items.forEach(item => html += `<option value="${item}">${item}</option>`);
+            el.innerHTML = html;
+        }
+
+        function setActiveType(type) {
+            activeType = type; 
+            if(type !== 'group') document.getElementById('filter-group').value = 'all';
+            if(type !== 'teacher') document.getElementById('filter-teacher').value = 'all';
+            if(type !== 'room') document.getElementById('filter-room').value = 'all';
+            document.getElementById('filter-group').classList.remove('active-filter');
+            document.getElementById('filter-teacher').classList.remove('active-filter');
+            document.getElementById('filter-room').classList.remove('active-filter');
+            document.getElementById(`filter-${type}`).classList.add('active-filter');
+        }
+
+        function clearSchedule() {
+            globalSchedule = [];
+            document.getElementById('schedule-container').innerHTML = '';
+            document.getElementById('schedule-container').style.display = 'none';
+            document.getElementById('empty-state').style.display = 'block';
+            document.getElementById('filter-group').value = 'all';
+            setActiveType('group');
+        }
+
+        async function fetchSchedule() {
+            if(globalSchedule.length > 0) return true;
+            try {
+                const res = await fetch('/api/generate');
+                if(!res.ok) { const err = await res.json(); throw new Error(err.error || "Server Error"); }
+                globalSchedule = await res.json();
+                return globalSchedule.length > 0;
+            } catch (err) { alert("Error: " + err.message); return false; }
+        }
+
+        function naturalSort(arr) {
+            return arr.sort((a, b) => a.localeCompare(b, 'th', { numeric: true }));
+        }
+
+        async function generateAndRender() {
+            document.getElementById('loading-spinner').style.display = 'block';
+            document.getElementById('schedule-container').style.display = 'none';
+            document.getElementById('empty-state').style.display = 'none';
+            document.getElementById('schedule-container').innerHTML = '';
+
+            const success = await fetchSchedule();
+            if(!success) { document.getElementById('loading-spinner').style.display = 'none'; document.getElementById('empty-state').style.display = 'block'; return; }
+
+            const selectedValue = document.getElementById(`filter-${activeType}`).value;
+            if (selectedValue === 'all') {
+                if(activeType === 'group') renderTable('group', naturalSort([...new Set(globalSchedule.map(s => s.group))]));
+                else if(activeType === 'teacher') renderTable('teacher', naturalSort([...new Set(globalSchedule.map(s => s.teacher))]));
+                else if(activeType === 'room') renderTable('room', naturalSort([...new Set(globalSchedule.map(s => s.room))]));
+            } else renderTable(activeType, [selectedValue]);
+
+            document.getElementById('loading-spinner').style.display = 'none';
+            document.getElementById('schedule-container').style.display = 'block';
+        }
+
+        async function printSchedule(mode) {
+            document.getElementById('loading-spinner').style.display = 'block';
+            document.getElementById('schedule-container').style.display = 'none';
+            document.getElementById('empty-state').style.display = 'none';
+            document.getElementById('schedule-container').innerHTML = '';
+
+            const success = await fetchSchedule();
+            if(!success) { document.getElementById('loading-spinner').style.display = 'none'; return; }
+
+            if (mode === 'all') {
+                renderTable('group', naturalSort([...new Set(globalSchedule.map(s => s.group))]));
+                addPageBreak();
+                renderTable('teacher', naturalSort([...new Set(globalSchedule.map(s => s.teacher))]));
+                addPageBreak();
+                renderTable('room', naturalSort([...new Set(globalSchedule.map(s => s.room))]));
+            } else {
+                let items = [];
+                if(mode==='group') items = naturalSort([...new Set(globalSchedule.map(s => s.group))]);
+                else if(mode==='teacher') items = naturalSort([...new Set(globalSchedule.map(s => s.teacher))]);
+                else if(mode==='room') items = naturalSort([...new Set(globalSchedule.map(s => s.room))]);
+                renderTable(mode, items);
+            }
+
+            document.getElementById('loading-spinner').style.display = 'none';
+            document.getElementById('schedule-container').style.display = 'block';
+            setTimeout(() => window.print(), 800);
+        }
+
+        function addPageBreak() {
+            const div = document.createElement('div');
+            div.className = 'print-section-break';
+            document.getElementById('schedule-container').appendChild(div);
+        }
+
+        function renderTable(type, itemsToShow) {
+            const container = document.getElementById('schedule-container');
+            const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+            const dayMap = { 'Mon':'จันทร์', 'Tue':'อังคาร', 'Wed':'พุธ', 'Thu':'พฤหัส', 'Fri':'ศุกร์' };
+
+            itemsToShow.forEach(itemId => {
+                const card = document.createElement('div');
+                card.className = 'schedule-card';
+
+                let infoContentHTML = '';
+                let sampleClass = globalSchedule.find(s => s.group === itemId);
+                let advisorName = ".......................................";
+                if (sampleClass && sampleClass.group_advisor && sampleClass.group_advisor !== "undefined") {
+                    advisorName = sampleClass.group_advisor;
+                }
+
+                if (type === 'group') {
+                    infoContentHTML = `
+                        <div class="info-label mt-2"><b>กลุ่มเรียน:</b> ${itemId}</div>
+                        <div class="info-label"><b>ครูที่ปรึกษา:</b> ${advisorName}</div>
+                    `;
+                } else if (type === 'teacher') {
+                    infoContentHTML = `
+                        <div class="info-label mt-2"><b>ชื่อ-สกุล:</b> ${itemId}</div>
+                        <div class="info-label"><b>ตำแหน่ง:</b> ครูผู้สอน / หัวหน้าแผนก</div>
+                    `;
+                } else { 
+                    infoContentHTML = `
+                        <div class="info-label mt-2"><b>ห้องเรียน:</b> ${itemId}</div>
+                    `;
+                }
+
+                let myClasses = [];
+                if(type === 'group') myClasses = globalSchedule.filter(s => s.group === itemId);
+                else if(type === 'teacher') myClasses = globalSchedule.filter(s => s.teacher === itemId);
+                else myClasses = globalSchedule.filter(s => s.room === itemId);
+
+                const subjectSummary = {};
+                myClasses.forEach(c => {
+                    if(!subjectSummary[c.subject]) {
+                        subjectSummary[c.subject] = { code: c.subject, name: c.subject_name, th: parseInt(c.theory||0), pr: parseInt(c.practice||0) };
+                    }
+                });
+                
+                const subjectsArray = Object.values(subjectSummary).sort((a,b) => a.code.localeCompare(b.code));
+                subjectsArray.forEach(s => { s.cr = Math.floor(s.th + s.pr/2); s.hr = s.th + s.pr; });
+
+                const midPoint = Math.ceil(subjectsArray.length / 2);
+                const leftSubs = subjectsArray.slice(0, midPoint);
+                const rightSubs = subjectsArray.slice(midPoint);
+                
+                let l_th=0,l_pr=0,l_cr=0,l_hr=0; leftSubs.forEach(s=>{l_th+=s.th;l_pr+=s.pr;l_cr+=s.cr;l_hr+=s.hr;});
+                let r_th=0,r_pr=0,r_cr=0,r_hr=0; rightSubs.forEach(s=>{r_th+=s.th;r_pr+=s.pr;r_cr+=s.cr;r_hr+=s.hr;});
+                const t_th=l_th+r_th, t_pr=l_pr+r_pr, t_cr=l_cr+r_cr, t_hr=l_hr+r_hr;
+
+                let html = `
+                    <table class="master-table">
+                        <tr>
+                            <td class="cell-info-left">
+                                <img src="/img/2.png" alt="Logo" class="college-logo" onerror="this.style.display='none'">
+                                <div class="info-text">ภาคเรียนที่ 2/2568<br>วิทยาลัยเทคนิคพังงา</div>
+                                ${infoContentHTML}
+                            </td>
+                            <td style="padding:0; vertical-align:top;">
+                                <table class="inner-summary-table">
+                                    <thead>
+                                        <tr>
+                                            <th style="width:3%">ที่</th><th style="width:10%">รหัส</th><th style="width:20%">วิชา</th>
+                                            <th style="width:3%">ท</th><th style="width:3%">ป</th><th style="width:3%">น</th><th style="width:3%">ช</th>
+                                            <th style="width:3%">ที่</th><th style="width:10%">รหัส</th><th style="width:20%">วิชา</th>
+                                            <th style="width:3%">ท</th><th style="width:3%">ป</th><th style="width:3%">น</th><th style="width:3%">ช</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>`;
+
+                const maxRows = Math.max(leftSubs.length, rightSubs.length, 6);
+                for(let i=0; i<maxRows; i++) {
+                    const l = leftSubs[i] || {code:'', name:'', th:'', pr:'', cr:'', hr:''};
+                    const r = rightSubs[i] || {code:'', name:'', th:'', pr:'', cr:'', hr:''};
+                    html += `<tr>
+                        <td>${leftSubs[i]?i+1:''}</td><td>${l.code}</td><td class="text-left">${l.name}</td><td>${l.th}</td><td>${l.pr}</td><td>${l.cr}</td><td>${l.hr}</td>
+                        <td>${rightSubs[i]?midPoint+i+1:''}</td><td>${r.code}</td><td class="text-left">${r.name}</td><td>${r.th}</td><td>${r.pr}</td><td>${r.cr}</td><td>${r.hr}</td>
+                    </tr>`;
+                }
+
+                html += `   </tbody>
+                                    <tfoot>
+                                        <tr>
+                                            <td colspan="3" style="text-align:right"><b>รวมย่อย</b></td><td>${l_th}</td><td>${l_pr}</td><td>${l_cr}</td><td>${l_hr}</td>
+                                            <td colspan="3" style="text-align:right"><b>รวมย่อย</b></td><td>${r_th}</td><td>${r_pr}</td><td>${r_cr}</td><td>${r_hr}</td>
+                                        </tr>
+                                        <tr>
+                                            <td colspan="7"></td>
+                                            <td colspan="3" style="text-align:right"><b>รวมทั้งสิ้น</b></td>
+                                            <td><b>${t_th}</b></td><td><b>${t_pr}</b></td><td><b>${t_cr}</b></td><td><b>${t_hr}</b></td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td colspan="2" style="padding:0; border-top: 1px solid #000;">
+                                <table class="inner-matrix-table">
+                                    <thead>
+                                        <tr>
+                                            <th class="day-header">วัน</th>
+                                            ${Array.from({length:12}, (_,i) => `<th>${i+1}<br><span style="font-weight:normal;font-size:0.6rem">${8+i}:00-${9+i}:00</span></th>`).join('')}
+                                        </tr>
+                                    </thead>
+                                    <tbody>`;
+
+                days.forEach(day => {
+                    html += `<tr><td class="day-header">${dayMap[day]}</td>`;
+                    for(let p=1; p<=12; p++) {
+                        let match = null;
+                        if(type === 'group') match = globalSchedule.find(s => s.group === itemId && s.day === day && s.period === p);
+                        else if(type === 'teacher') match = globalSchedule.find(s => s.teacher === itemId && s.day === day && s.period === p);
+                        else match = globalSchedule.find(s => s.room === itemId && s.day === day && s.period === p);
+
+                        if(p === 5) html += `<td class="lunch-break">พักเที่ยง</td>`;
+                        else if(match) {
+                            let line1 = match.subject;
+                            let line2 = '', line3 = '';
+                            if(type === 'group') { line2 = match.teacher; line3 = match.room; }
+                            else if(type === 'teacher') { line2 = match.group; line3 = match.room; }
+                            else { line2 = match.teacher; line3 = match.group; }
+                            html += `<td><div class="class-box"><span class="subject-code">${line1}</span><div class="details-badge">${line2}</div><div class="secondary-info">${line3}</div></div></td>`;
+                        } else html += `<td class="${p>8?'evening-slot':''}"></td>`;
+                    }
+                    html += `</tr>`;
+                });
+
+                html += `           </tbody>
+                                </table>
+                            </td>
+                        </tr>
+                    </table>`;
+
+                html += `
+                    <div class="signature-section">
+                        <div class="sig-box"><div class="sig-line">ลงชื่อ.......................................</div><div class="sig-line">(.......................................)</div><div class="sig-role">หัวหน้าแผนกวิชา</div></div>
+                        <div class="sig-box"><div class="sig-line">ลงชื่อ.......................................</div><div class="sig-line">(.......................................)</div><div class="sig-role">หัวหน้างานพัฒนาหลักสูตรฯ</div></div>
+                        <div class="sig-box"><div class="sig-line">ลงชื่อ.......................................</div><div class="sig-line">(.......................................)</div><div class="sig-role">รองผู้อำนวยการฝ่ายวิชาการ</div></div>
+                        <div class="sig-box"><div class="sig-line">ลงชื่อ.......................................</div><div class="sig-line">(.......................................)</div><div class="sig-role">ผู้อำนวยการ</div></div>
+                    </div>
+                `;
+
+                card.innerHTML = html;
+                container.appendChild(card);
+            });
+        }
+
+        // --- Export HTML to Excel ---
+        function exportToExcelPro() {
+            if (globalSchedule.length === 0) return alert("กรุณากดสุ่มตารางก่อน");
+            var content = document.getElementById('schedule-container').innerHTML;
+            var excelTemplate = `
+                <html xmlns:o="urn:schemas-microsoft-com:office:office" 
+                      xmlns:x="urn:schemas-microsoft-com:office:excel" 
+                      xmlns="http://www.w3.org/TR/REC-html40">
+                <head>
+                    <meta http-equiv="content-type" content="text/vnd.ms-excel; charset=UTF-8">
+                    <style>
+                        body { font-family: 'Prompt', sans-serif; font-size: 10pt; }
+                        table { border-collapse: collapse; width: 100%; mso-displayed-decimal-separator:"."; mso-displayed-thousand-separator:","; }
+                        td, th { border: 1px solid #000000; text-align: center; vertical-align: top; padding: 3px; }
+                        .lunch-break { background-color: #f2f2f2; mso-pattern: auto none; }
+                        .day-header { background-color: #f8f9fa; font-weight: bold; }
+                        th { background-color: #f0f0f0; font-weight: bold; }
+                        .text-left { text-align: left; }
+                        .cell-info-left { text-align: center; vertical-align: middle; }
+                        .signature-section { display: none; } 
+                    </style>
+                </head>
+                <body>${content}</body></html>`;
+            var blob = new Blob([excelTemplate], { type: 'application/vnd.ms-excel' });
+            var url = URL.createObjectURL(blob);
+            var link = document.createElement("a");
+            link.setAttribute("href", url);
+            link.setAttribute("download", "Class_Schedule_Full.xls");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // --- Export Raw Data to CSV ---
+        function exportToCSV() {
+            if (globalSchedule.length === 0) return alert("กรุณากดสุ่มตารางก่อน");
+            const headers = ["Group", "Teacher", "Room", "Subject Code", "Subject Name", "Day", "Period", "Time", "Advisor"];
+            const rows = globalSchedule.map(item => [
+                `"${item.group}"`, `"${item.teacher}"`, `"${item.room}"`, `"${item.subject}"`, `"${item.subject_name}"`, `"${item.day}"`, `"${item.period}"`, `"${item.time}"`, `"${item.group_advisor || ''}"`
+            ].join(","));
+            const csvContent = "\uFEFF" + headers.join(",") + "\n" + rows.join("\n");
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.setAttribute("href", url);
+            link.setAttribute("download", "Class_Schedule_Data.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    </script>
+</body>
+</html>
