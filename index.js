@@ -8,7 +8,7 @@ const db = require('./database');
 const path = require('path');
 
 const app = express();
-const PORT = 3000;
+const PORT = 80;
 
 app.set('view engine', 'ejs');
 app.use(bodyParser.urlencoded({ extended: true }));
